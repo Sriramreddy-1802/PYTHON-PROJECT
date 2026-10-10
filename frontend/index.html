@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Health Camp Coverage Analyzer | Modern Data Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        zinc: {
+                            950: '#09090b',
+                            900: '#0c0c0f',
+                            850: '#121216',
+                            800: '#1e1e24',
+                            700: '#27272a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['DM Sans', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
+    <!-- Apache ECharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Leaflet CSS & JS for Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        body { font-family: 'DM Sans', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #27272a; border-radius: 4px; }
+        .leaflet-container { background: #0c0c0f !important; border-radius: 0.75rem; }
+    </style>
+</head>
+<body class="bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 min-h-screen transition-colors duration-200">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 backdrop-blur sticky top-0 z-40">
+        <div class="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center text-blue-500">
+                    <i data-lucide="activity" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl font-bold tracking-tight text-zinc-950 dark:text-zinc-50">Health Camp Coverage Analyzer</h1>
+                        <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">PUBLIC HEALTH PLATFORM</span>
+                    </div>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Monitoring population coverage, medical screening metrics, and healthcare resource distribution.</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3">
+                <button id="themeToggle" class="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800/80 text-xs font-medium text-zinc-700 dark:text-zinc-200 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
+                    <i data-lucide="sun" id="sunIcon" class="w-4 h-4 hidden"></i>
+                    <i data-lucide="moon" id="moonIcon" class="w-4 h-4"></i>
+                    <span id="themeText">Dark Mode</span>
+                </button>
+                <button onclick="exportDataCSV()" class="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm transition-colors">
+                    <i data-lucide="download" class="w-4 h-4"></i> Export CSV
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
+
+        <!-- Global Filters Row -->
+        <section class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 shadow-sm">
+            <div class="flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">
+                <i data-lucide="filter" class="w-4 h-4 text-blue-500"></i> Analytics Filter Controls
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1">District / Territory</label>
+                    <select id="districtFilter" onchange="applyFilters()" class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="ALL">All Districts</option>
+                        <option value="Northern District">Northern District</option>
+                        <option value="Eastern Valley">Eastern Valley</option>
+                        <option value="Southern Hills">Southern Hills</option>
+                        <option value="Western Coastal">Western Coastal</option>
+                        <option value="Central Metro">Central Metro</option>
+                        <option value="Highland Tribal Zone">Highland Tribal Zone</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1">Camp Category</label>
+                    <select id="categoryFilter" onchange="applyFilters()" class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="ALL">All Categories</option>
+                        <option value="General Screening">General Screening</option>
+                        <option value="Maternal & Child Health">Maternal & Child Health</option>
+                        <option value="Eye & Dental Care">Eye & Dental Care</option>
+                        <option value="Non-Communicable Diseases (NCD)">Non-Communicable Diseases (NCD)</option>
+                        <option value="Mobile Clinic Outreach">Mobile Clinic Outreach</option>
+                        <option value="Geriatric Special Care">Geriatric Special Care</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1">Coverage Status</label>
+                    <select id="statusFilter" onchange="applyFilters()" class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="ALL">All Statuses</option>
+                        <option value="Target Exceeded">Target Exceeded (≥90%)</option>
+                        <option value="Optimal Coverage">Optimal Coverage (75–89%)</option>
+                        <option value="Moderate Coverage">Moderate Coverage (55–74%)</option>
+                        <option value="Under-Served">Under-Served (<55%)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-zinc-500 mb-1">Search Camp Name or ID</label>
+                    <div class="relative">
+                        <input type="text" id="searchInput" oninput="applyFilters()" placeholder="Search camp..." class="w-full bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <i data-lucide="search" class="w-4 h-4 text-zinc-400 absolute left-3 top-2.5"></i>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- KPI Summary Cards Row -->
+        <section class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+                <div class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Total Camps Conducted</div>
+                <div class="text-2xl font-bold font-mono mt-1 text-zinc-950 dark:text-zinc-50" id="kpiTotalCamps">120</div>
+                <div class="mt-2 inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                    <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i> +12.4% vs last cycle
+                </div>
+            </div>
+            
+            <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+                <div class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Target Population</div>
+                <div class="text-2xl font-bold font-mono mt-1 text-zinc-950 dark:text-zinc-50" id="kpiTargetPop">180,450</div>
+                <div class="mt-2 inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    <i data-lucide="users" class="w-3.5 h-3.5"></i> Identified Cohort
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+                <div class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Patients Screened</div>
+                <div class="text-2xl font-bold font-mono mt-1 text-zinc-950 dark:text-zinc-50" id="kpiScreened">138,920</div>
+                <div class="mt-2 inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" id="kpiCoverageBadge">
+                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> 77.0% Coverage
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+                <div class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Critical Referrals</div>
+                <div class="text-2xl font-bold font-mono mt-1 text-rose-600 dark:text-rose-400" id="kpiCritical">10,410</div>
+                <div class="mt-2 inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                    <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> 7.5% Urgent Rate
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+                <div class="text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">Avg Cost / Patient</div>
+                <div class="text-2xl font-bold font-mono mt-1 text-zinc-950 dark:text-zinc-50" id="kpiAvgCost">$24.80</div>
+                <div class="mt-2 inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                    <i data-lucide="dollar-sign" class="w-3.5 h-3.5"></i> High Efficiency
+                </div>
+            </div>
+        </section>
+
+        <!-- Main Content Grid -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            <!-- Map Card (7 cols) -->
+            <div class="lg:col-span-7 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h2 class="text-base font-bold text-zinc-950 dark:text-zinc-50">Geospatial Health Camp Coverage Map</h2>
+                        <p class="text-xs text-zinc-500 dark:text-zinc-400">Interactive camp locations colored by coverage % and sized by volume screened.</p>
+                    </div>
+                    <span class="text-xs font-mono text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">Leaflet GIS Engine</span>
+                </div>
+                <div id="map" class="w-full h-[400px] rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800"></div>
+            </div>
+
+            <!-- District Coverage Stacked Bar Chart (5 cols) -->
+            <div class="lg:col-span-5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm flex flex-col">
+                <div class="mb-2">
+                    <h2 class="text-base font-bold text-zinc-950 dark:text-zinc-50">District Population Coverage & Unscreened Gap</h2>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Comparing total target population against screened beneficiaries.</p>
+                </div>
+                <div id="districtChart" class="w-full h-[400px]"></div>
+            </div>
+        </section>
+
+        <!-- Charts Row 2: Analytics Breakdown -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Age & Demographics Donut -->
+            <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+                <h3 class="text-sm font-bold text-zinc-950 dark:text-zinc-50 mb-1">Age Bracket Breakdown</h3>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Beneficiary distribution across age cohorts</p>
+                <div id="ageChart" class="w-full h-[280px]"></div>
+            </div>
+
+            <!-- Disease Prevalence Bar Chart -->
+            <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+                <h3 class="text-sm font-bold text-zinc-950 dark:text-zinc-50 mb-1">Disease Screening Positives</h3>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Total clinical cases detected across health camps</p>
+                <div id="diseaseChart" class="w-full h-[280px]"></div>
+            </div>
+
+            <!-- Staff Deployment Stacked Bar -->
+            <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+                <h3 class="text-sm font-bold text-zinc-950 dark:text-zinc-50 mb-1">Medical Personnel Ratios</h3>
+                <p class="text-xs text-zinc-500 dark:text-zinc-400 mb-3">Doctors, Nurses, and CHWs deployed by organizer</p>
+                <div id="staffChart" class="w-full h-[280px]"></div>
+            </div>
+        </section>
+
+        <!-- Master Data Ledger & Details Side Panel Flex Container -->
+        <section class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-base font-bold text-zinc-950 dark:text-zinc-50">Health Camp Performance Directory</h2>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Click any row to open detailed camp telemetry panel</p>
+                </div>
+                <div class="text-xs text-zinc-400">Showing <span font-mono id="recordCount">120</span> health camps</div>
+            </div>
+
+            <div class="flex gap-6 relative">
+                <!-- Data Table -->
+                <div id="tableWrapper" class="w-full transition-all duration-300 overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-zinc-100 dark:bg-zinc-950 text-zinc-500 dark:text-zinc-400 uppercase font-semibold text-[11px] border-b border-zinc-200 dark:border-zinc-800">
+                                <th class="p-3">Camp ID</th>
+                                <th class="p-3">Camp Name & Organizer</th>
+                                <th class="p-3">District</th>
+                                <th class="p-3">Category</th>
+                                <th class="p-3 text-right">Target Pop</th>
+                                <th class="p-3 text-right">Screened</th>
+                                <th class="p-3">Coverage Status</th>
+                                <th class="p-3 text-right">Critical Referrals</th>
+                                <th class="p-3 text-right">Cost/Patient</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-zinc-100 dark:divide-zinc-800/60 font-sans">
+                            <!-- JS rendered rows -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Side Investigation Panel -->
+                <div id="sidePanel" class="hidden w-1/3 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 flex-col justify-between shrink-0 transition-all duration-300">
+                    <div>
+                        <div class="flex items-start justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3 mb-4">
+                            <div>
+                                <span class="text-xs font-mono font-bold text-blue-500" id="panelCampId">CMP-1001</span>
+                                <h3 class="text-base font-bold text-zinc-950 dark:text-zinc-50" id="panelCampName">Northern District Screening #1</h3>
+                                <p class="text-xs text-zinc-500" id="panelOrganizer">Ministry of Health</p>
+                            </div>
+                            <button onclick="closeSidePanel()" class="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200">
+                                <i data-lucide="x" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+
+                        <div class="space-y-4 text-xs">
+                            <div class="grid grid-cols-2 gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3">
+                                <div>
+                                    <div class="text-zinc-400">District</div>
+                                    <div class="font-semibold text-zinc-900 dark:text-zinc-100" id="panelDistrict">Northern District</div>
+                                </div>
+                                <div>
+                                    <div class="text-zinc-400">Coverage Status</div>
+                                    <div class="font-semibold" id="panelStatus">Optimal</div>
+                                </div>
+                                <div>
+                                    <div class="text-zinc-400">Target Population</div>
+                                    <div class="font-semibold font-mono" id="panelTarget">1,850</div>
+                                </div>
+                                <div>
+                                    <div class="text-zinc-400">Patients Screened</div>
+                                    <div class="font-semibold font-mono text-emerald-500" id="panelScreened">1,420</div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="font-semibold text-zinc-950 dark:text-zinc-100 mb-2">Clinical Screenings Summary</div>
+                                <div class="space-y-1.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3">
+                                    <div class="flex justify-between">
+                                        <span class="text-zinc-400">Hypertension:</span>
+                                        <span class="font-mono font-semibold" id="panelHypertension">142 cases</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-zinc-400">Diabetes:</span>
+                                        <span class="font-mono font-semibold" id="panelDiabetes">88 cases</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-zinc-400">Anemia:</span>
+                                        <span class="font-mono font-semibold" id="panelAnemia">210 cases</span>
+                                    </div>
+                                    <div class="flex justify-between text-rose-500 font-bold">
+                                        <span>Critical Referrals:</span>
+                                        <span class="font-mono" id="panelCritical">34 cases</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="font-semibold text-zinc-950 dark:text-zinc-100 mb-2">Resource & Personnel Deployment</div>
+                                <div class="grid grid-cols-3 gap-2 text-center bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3">
+                                    <div>
+                                        <div class="font-mono font-bold text-blue-500 text-sm" id="panelDoctors">4</div>
+                                        <div class="text-[10px] text-zinc-400">Doctors</div>
+                                    </div>
+                                    <div>
+                                        <div class="font-mono font-bold text-purple-500 text-sm" id="panelNurses">8</div>
+                                        <div class="text-[10px] text-zinc-400">Nurses</div>
+                                    </div>
+                                    <div>
+                                        <div class="font-mono font-bold text-cyan-500 text-sm" id="panelCHWs">12</div>
+                                        <div class="text-[10px] text-zinc-400">CHWs</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-zinc-200 dark:border-zinc-800 flex gap-2">
+                        <button onclick="alert('Camp flagged for follow-up audit.')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg text-xs transition-colors">
+                            Flag for Audit
+                        </button>
+                        <button onclick="closeSidePanel()" class="w-full bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-200 font-semibold py-2 rounded-lg text-xs transition-colors">
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- What-If Simulator Section -->
+        <section class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 shadow-sm">
+            <div class="flex items-center gap-2 mb-4">
+                <i data-lucide="sparkles" class="w-5 h-5 text-amber-500"></i>
+                <div>
+                    <h2 class="text-base font-bold text-zinc-950 dark:text-zinc-50">What-If Coverage Optimizer & Resource Simulator</h2>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">Simulate coverage expansion by adjusting medical staff deployment and budget allocation</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div class="lg:col-span-5 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1">Select Target District</label>
+                        <select id="simDistrict" onchange="runSimulation()" class="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-2 text-xs">
+                            <option value="Highland Tribal Zone">Highland Tribal Zone (Under-Served)</option>
+                            <option value="Eastern Valley">Eastern Valley</option>
+                            <option value="Western Coastal">Western Coastal</option>
+                            <option value="Southern Hills">Southern Hills</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs font-medium mb-1">
+                            <span class="text-zinc-500">Additional Doctors per Camp:</span>
+                            <span class="font-mono font-bold text-blue-500" id="simDocVal">+2</span>
+                        </div>
+                        <input type="range" id="simDoctors" min="0" max="8" value="2" oninput="runSimulation()" class="w-full accent-blue-500">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs font-medium mb-1">
+                            <span class="text-zinc-500">Additional CHWs:</span>
+                            <span class="font-mono font-bold text-cyan-500" id="simChwVal">+5</span>
+                        </div>
+                        <input type="range" id="simCHWs" min="0" max="20" value="5" oninput="runSimulation()" class="w-full accent-cyan-500">
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between text-xs font-medium mb-1">
+                            <span class="text-zinc-500">Budget Expansion %:</span>
+                            <span class="font-mono font-bold text-emerald-500" id="simBudgetVal">+20%</span>
+                        </div>
+                        <input type="range" id="simBudget" min="0" max="100" value="20" oninput="runSimulation()" class="w-full accent-emerald-500">
+                    </div>
+                </div>
+
+                <div class="lg:col-span-7 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl p-5 flex flex-col justify-between">
+                    <div class="grid grid-cols-3 gap-4 mb-4">
+                        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 text-center">
+                            <div class="text-[11px] text-zinc-400 uppercase font-semibold">Current Baseline</div>
+                            <div class="text-lg font-bold font-mono text-zinc-500 mt-0.5" id="simCurrentCov">61.4%</div>
+                        </div>
+                        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 text-center border-emerald-500/40">
+                            <div class="text-[11px] text-emerald-500 uppercase font-semibold">Simulated Coverage</div>
+                            <div class="text-lg font-bold font-mono text-emerald-500 mt-0.5" id="simProjectedCov">78.8%</div>
+                        </div>
+                        <div class="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 text-center">
+                            <div class="text-[11px] text-blue-500 uppercase font-semibold">Additional Patients</div>
+                            <div class="text-lg font-bold font-mono text-blue-500 mt-0.5" id="simAddedPatients">+5,046</div>
+                        </div>
+                    </div>
+
+                    <div id="simChart" class="w-full h-[180px]"></div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- App Data & Scripts -->
+    <script>
+        let fullData = [];
+        let filteredData = [];
+        let mapInstance = null;
+        let mapMarkers = [];
+
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Dark / Light Theme Toggle
+        const themeToggleBtn = document.getElementById('themeToggle');
+        themeToggleBtn.addEventListener('click', () => {
+            const html = document.documentElement;
+            const isDark = html.classList.toggle('dark');
+            document.getElementById('sunIcon').classList.toggle('hidden', !isDark);
+            document.getElementById('moonIcon').classList.toggle('hidden', isDark);
+            document.getElementById('themeText').textContent = isDark ? 'Dark Mode' : 'Light Mode';
+            renderAllCharts();
+        });
+
+        // Generate synthetic data in JS
+        function generateData() {
+            const districts = [
+                { name: "Northern District", lat: 18.5204, lon: 73.8567 },
+                { name: "Eastern Valley", lat: 18.6298, lon: 73.7997 },
+                { name: "Southern Hills", lat: 18.4485, lon: 73.8587 },
+                { name: "Western Coastal", lat: 18.5089, lon: 73.9260 },
+                { name: "Central Metro", lat: 18.5314, lon: 73.8446 },
+                { name: "Highland Tribal Zone", lat: 18.7500, lon: 73.6500 }
+            ];
+
+            const categories = ["General Screening", "Maternal & Child Health", "Eye & Dental Care", "Non-Communicable Diseases (NCD)", "Mobile Clinic Outreach", "Geriatric Special Care"];
+            const organizers = ["Ministry of Health", "Global Care Foundation", "Community Health Alliance", "Red Cross Services", "Apex Hospital Trust"];
+
+            let data = [];
+            for (let i = 1; i <= 120; i++) {
+                const dist = districts[Math.floor(Math.random() * districts.length)];
+                const cat = categories[Math.floor(Math.random() * categories.length)];
+                const org = organizers[Math.floor(Math.random() * organizers.length)];
+                
+                const lat = dist.lat + (Math.random() - 0.5) * 0.12;
+                const lon = dist.lon + (Math.random() - 0.5) * 0.12;
+                
+                const target = Math.floor(800 + Math.random() * 1400);
+                const eff = dist.name === "Highland Tribal Zone" ? (0.5 + Math.random() * 0.25) : (0.7 + Math.random() * 0.25);
+                const screened = Math.floor(target * eff);
+                const covPct = parseFloat(((screened / target) * 100).toFixed(1));
+
+                let status = "Moderate Coverage";
+                if (covPct >= 90) status = "Target Exceeded";
+                else if (covPct >= 75) status = "Optimal Coverage";
+                else if (covPct < 55) status = "Under-Served";
+
+                data.push({
+                    id: `CMP-${1000 + i}`,
+                    name: `${dist.name} ${cat} #${i}`,
+                    district: dist.name,
+                    category: cat,
+                    organizer: org,
+                    lat: lat,
+                    lon: lon,
+                    target: target,
+                    screened: screened,
+                    coveragePct: covPct,
+                    status: status,
+                    hypertension: Math.floor(screened * (0.12 + Math.random() * 0.14)),
+                    diabetes: Math.floor(screened * (0.08 + Math.random() * 0.12)),
+                    anemia: Math.floor(screened * (0.15 + Math.random() * 0.18)),
+                    critical: Math.floor(screened * (0.04 + Math.random() * 0.06)),
+                    doctors: Math.floor(2 + Math.random() * 6),
+                    nurses: Math.floor(4 + Math.random() * 10),
+                    chws: Math.floor(6 + Math.random() * 14),
+                    costPerPatient: parseFloat((18 + Math.random() * 16).toFixed(2))
+                });
+            }
+            return data;
+        }
+
+        fullData = generateData();
+        filteredData = [...fullData];
+
+        // Filter Logic
+        function applyFilters() {
+            const dist = document.getElementById('districtFilter').value;
+            const cat = document.getElementById('categoryFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            const search = document.getElementById('searchInput').value.toLowerCase();
+
+            filteredData = fullData.filter(d => {
+                const matchDist = dist === 'ALL' || d.district === dist;
+                const matchCat = cat === 'ALL' || d.category === cat;
+                const matchStatus = status === 'ALL' || d.status === status;
+                const matchSearch = d.name.toLowerCase().includes(search) || d.id.toLowerCase().includes(search);
+                return matchDist && matchCat && matchStatus && matchSearch;
+            });
+
+            updateKPIs();
+            renderMap();
+            renderAllCharts();
+            renderTable();
+        }
+
+        function updateKPIs() {
+            const totalCamps = filteredData.length;
+            const totalTarget = filteredData.reduce((acc, d) => acc + d.target, 0);
+            const totalScreened = filteredData.reduce((acc, d) => acc + d.screened, 0);
+            const totalCritical = filteredData.reduce((acc, d) => acc + d.critical, 0);
+            const avgCost = totalCamps > 0 ? (filteredData.reduce((acc, d) => acc + d.costPerPatient, 0) / totalCamps).toFixed(2) : '0.00';
+            const overallCov = totalTarget > 0 ? ((totalScreened / totalTarget) * 100).toFixed(1) : '0.0';
+
+            document.getElementById('kpiTotalCamps').textContent = totalCamps.toLocaleString();
+            document.getElementById('kpiTargetPop').textContent = totalTarget.toLocaleString();
+            document.getElementById('kpiScreened').textContent = totalScreened.toLocaleString();
+            document.getElementById('kpiCritical').textContent = totalCritical.toLocaleString();
+            document.getElementById('kpiAvgCost').textContent = `$${avgCost}`;
+            document.getElementById('kpiCoverageBadge').innerHTML = `<i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> ${overallCov}% Coverage`;
+            lucide.createIcons();
+        }
+
+        // Initialize Map
+        function renderMap() {
+            if (!mapInstance) {
+                mapInstance = L.map('map').setView([18.55, 73.85], 9);
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap &copy; CARTO'
+                }).addTo(mapInstance);
+            }
+
+            // Clear old markers
+            mapMarkers.forEach(m => mapInstance.removeLayer(m));
+            mapMarkers = [];
+
+            filteredData.forEach(d => {
+                const color = d.coveragePct >= 85 ? '#22c55e' : (d.coveragePct >= 65 ? '#3b82f6' : '#ef4444');
+                const radius = Math.max(6, Math.min(18, d.screened / 100));
+                
+                const marker = L.circleMarker([d.lat, d.lon], {
+                    radius: radius,
+                    fillColor: color,
+                    color: '#ffffff',
+                    weight: 1,
+                    opacity: 0.9,
+                    fillOpacity: 0.7
+                }).addTo(mapInstance);
+
+                marker.bindPopup(`
+                    <div class="p-1 text-xs text-zinc-900 font-sans">
+                        <strong>${d.name}</strong><br/>
+                        District: ${d.district}<br/>
+                        Screened: <strong>${d.screened}</strong> / ${d.target} (${d.coveragePct}%)<br/>
+                        Critical Referrals: <span style="color:#ef4444;">${d.critical}</span>
+                    </div>
+                `);
+
+                mapMarkers.push(marker);
+            });
+        }
+
+        // Render All ECharts
+        function renderAllCharts() {
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#a1a1aa' : '#52525b';
+            const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+
+            // 1. District Population Stacked Bar
+            const distMap = {};
+            filteredData.forEach(d => {
+                if (!distMap[d.district]) distMap[d.district] = { screened: 0, target: 0 };
+                distMap[d.district].screened += d.screened;
+                distMap[d.district].target += d.target;
+            });
+            const distNames = Object.keys(distMap);
+            const distScreened = distNames.map(k => distMap[k].screened);
+            const distGaps = distNames.map(k => Math.max(0, distMap[k].target - distMap[k].screened));
+
+            const distChart = echarts.init(document.getElementById('districtChart'));
+            distChart.setOption({
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                legend: { textStyle: { color: textColor } },
+                grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                xAxis: { type: 'value', splitLine: { lineStyle: { color: gridColor } }, axisLabel: { color: textColor } },
+                yAxis: { type: 'category', data: distNames, axisLabel: { color: textColor } },
+                series: [
+                    { name: 'Screened', type: 'bar', stack: 'total', data: distScreened, itemStyle: { color: '#3b82f6', borderRadius: [0, 0, 0, 0] } },
+                    { name: 'Unscreened Gap', type: 'bar', stack: 'total', data: distGaps, itemStyle: { color: '#f43f5e', borderRadius: [0, 4, 4, 0] } }
+                ]
+            });
+
+            // 2. Age Donut Chart
+            let u18 = 0, a18_60 = 0, a60 = 0;
+            filteredData.forEach(d => {
+                u18 += Math.floor(d.screened * 0.22);
+                a18_60 += Math.floor(d.screened * 0.58);
+                a60 += Math.floor(d.screened * 0.20);
+            });
+            const ageChart = echarts.init(document.getElementById('ageChart'));
+            ageChart.setOption({
+                tooltip: { trigger: 'item' },
+                legend: { bottom: '0', textStyle: { color: textColor } },
+                series: [{
+                    type: 'pie',
+                    radius: ['45%', '70%'],
+                    data: [
+                        { value: u18, name: 'Under 18 yrs', itemStyle: { color: '#38bdf8' } },
+                        { value: a18_60, name: '18–60 yrs', itemStyle: { color: '#818cf8' } },
+                        { value: a60, name: 'Above 60 yrs', itemStyle: { color: '#c084fc' } }
+                    ],
+                    label: { show: false }
+                }]
+            });
+
+            // 3. Disease Positives Bar Chart
+            let hyp = 0, diab = 0, ane = 0, crit = 0;
+            filteredData.forEach(d => {
+                hyp += d.hypertension;
+                diab += d.diabetes;
+                ane += d.anemia;
+                crit += d.critical;
+            });
+            const diseaseChart = echarts.init(document.getElementById('diseaseChart'));
+            diseaseChart.setOption({
+                tooltip: { trigger: 'axis' },
+                grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                xAxis: { type: 'category', data: ['Hypertension', 'Diabetes', 'Anemia', 'Critical'], axisLabel: { color: textColor } },
+                yAxis: { type: 'value', splitLine: { lineStyle: { color: gridColor } }, axisLabel: { color: textColor } },
+                series: [{
+                    type: 'bar',
+                    data: [
+                        { value: hyp, itemStyle: { color: '#ef4444' } },
+                        { value: diab, itemStyle: { color: '#f59e0b' } },
+                        { value: ane, itemStyle: { color: '#ec4899' } },
+                        { value: crit, itemStyle: { color: '#f43f5e' } }
+                    ],
+                    itemStyle: { borderRadius: [4, 4, 0, 0] }
+                }]
+            });
+
+            // 4. Staffing Chart
+            const orgMap = {};
+            filteredData.forEach(d => {
+                if (!orgMap[d.organizer]) orgMap[d.organizer] = { docs: 0, nurses: 0, chws: 0, count: 0 };
+                orgMap[d.organizer].docs += d.doctors;
+                orgMap[d.organizer].nurses += d.nurses;
+                orgMap[d.organizer].chws += d.chws;
+                orgMap[d.organizer].count += 1;
+            });
+            const orgs = Object.keys(orgMap);
+            const avgDocs = orgs.map(o => (orgMap[o].docs / orgMap[o].count).toFixed(1));
+            const avgNurses = orgs.map(o => (orgMap[o].nurses / orgMap[o].count).toFixed(1));
+            const avgCHWs = orgs.map(o => (orgMap[o].chws / orgMap[o].count).toFixed(1));
+
+            const staffChart = echarts.init(document.getElementById('staffChart'));
+            staffChart.setOption({
+                tooltip: { trigger: 'axis' },
+                legend: { textStyle: { color: textColor } },
+                grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+                xAxis: { type: 'category', data: orgs, axisLabel: { color: textColor, rotate: 15, fontSize: 10 } },
+                yAxis: { type: 'value', splitLine: { lineStyle: { color: gridColor } }, axisLabel: { color: textColor } },
+                series: [
+                    { name: 'Doctors', type: 'bar', stack: 'staff', data: avgDocs, itemStyle: { color: '#3b82f6' } },
+                    { name: 'Nurses', type: 'bar', stack: 'staff', data: avgNurses, itemStyle: { color: '#8b5cf6' } },
+                    { name: 'CHWs', type: 'bar', stack: 'staff', data: avgCHWs, itemStyle: { color: '#06b6d4', borderRadius: [4, 4, 0, 0] } }
+                ]
+            });
+
+            runSimulation();
+        }
+
+        // Data Table Render
+        function renderTable() {
+            const tbody = document.getElementById('tableBody');
+            document.getElementById('recordCount').textContent = filteredData.length;
+
+            tbody.innerHTML = filteredData.slice(0, 20).map(d => {
+                let badgeClass = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+                if (d.status === 'Target Exceeded') badgeClass = 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20';
+                else if (d.status === 'Optimal Coverage') badgeClass = 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+                else if (d.status === 'Moderate Coverage') badgeClass = 'bg-amber-500/10 text-amber-500 border-amber-500/20';
+                else if (d.status === 'Under-Served') badgeClass = 'bg-rose-500/10 text-rose-500 border-rose-500/20';
+
+                return `
+                    <tr onclick="openSidePanel('${d.id}')" class="hover:bg-zinc-100 dark:hover:bg-zinc-800/60 cursor-pointer transition-colors">
+                        <td class="p-3 font-mono font-bold text-blue-600 dark:text-blue-400">${d.id}</td>
+                        <td class="p-3">
+                            <div class="font-bold text-zinc-900 dark:text-zinc-100">${d.name}</div>
+                            <div class="text-[11px] text-zinc-400">${d.organizer}</div>
+                        </td>
+                        <td class="p-3">${d.district}</td>
+                        <td class="p-3">${d.category}</td>
+                        <td class="p-3 text-right font-mono">${d.target.toLocaleString()}</td>
+                        <td class="p-3 text-right font-mono font-bold text-zinc-900 dark:text-zinc-100">${d.screened.toLocaleString()}</td>
+                        <td class="p-3">
+                            <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold border ${badgeClass}">
+                                ${d.coveragePct}% (${d.status})
+                            </span>
+                        </td>
+                        <td class="p-3 text-right font-mono font-bold text-rose-500">${d.critical}</td>
+                        <td class="p-3 text-right font-mono">$${d.costPerPatient.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Side Details Panel Logic
+        function openSidePanel(campId) {
+            const camp = fullData.find(c => c.id === campId);
+            if (!camp) return;
+
+            document.getElementById('panelCampId').textContent = camp.id;
+            document.getElementById('panelCampName').textContent = camp.name;
+            document.getElementById('panelOrganizer').textContent = camp.organizer;
+            document.getElementById('panelDistrict').textContent = camp.district;
+            document.getElementById('panelStatus').textContent = `${camp.coveragePct}% (${camp.status})`;
+            document.getElementById('panelTarget').textContent = camp.target.toLocaleString();
+            document.getElementById('panelScreened').textContent = camp.screened.toLocaleString();
+            document.getElementById('panelHypertension').textContent = `${camp.hypertension} cases`;
+            document.getElementById('panelDiabetes').textContent = `${camp.diabetes} cases`;
+            document.getElementById('panelAnemia').textContent = `${camp.anemia} cases`;
+            document.getElementById('panelCritical').textContent = `${camp.critical} cases`;
+            document.getElementById('panelDoctors').textContent = camp.doctors;
+            document.getElementById('panelNurses').textContent = camp.nurses;
+            document.getElementById('panelCHWs').textContent = camp.chws;
+
+            const tableWrapper = document.getElementById('tableWrapper');
+            const sidePanel = document.getElementById('sidePanel');
+            
+            tableWrapper.className = 'w-2/3 transition-all duration-300 overflow-x-auto';
+            sidePanel.classList.remove('hidden');
+            sidePanel.classList.add('flex');
+        }
+
+        function closeSidePanel() {
+            const tableWrapper = document.getElementById('tableWrapper');
+            const sidePanel = document.getElementById('sidePanel');
+            
+            tableWrapper.className = 'w-full transition-all duration-300 overflow-x-auto';
+            sidePanel.classList.add('hidden');
+            sidePanel.classList.remove('flex');
+        }
+
+        // What-If Simulator Logic
+        function runSimulation() {
+            const docAdd = parseInt(document.getElementById('simDoctors').value);
+            const chwAdd = parseInt(document.getElementById('simCHWs').value);
+            const budgetPct = parseInt(document.getElementById('simBudget').value);
+
+            document.getElementById('simDocVal').textContent = `+${docAdd}`;
+            document.getElementById('simChwVal').textContent = `+${chwAdd}`;
+            document.getElementById('simBudgetVal').textContent = `+${budgetPct}%`;
+
+            const baseCov = 61.4;
+            const boost = (docAdd * 3.4) + (chwAdd * 1.6) + (budgetPct * 0.22);
+            const projected = Math.min(98.5, parseFloat((baseCov + boost).toFixed(1)));
+
+            const baseTarget = 28000;
+            const currentScreened = Math.floor(baseTarget * (baseCov / 100));
+            const projScreened = Math.floor(baseTarget * (projected / 100));
+            const added = projScreened - currentScreened;
+
+            document.getElementById('simCurrentCov').textContent = `${baseCov}%`;
+            document.getElementById('simProjectedCov').textContent = `${projected}%`;
+            document.getElementById('simAddedPatients').textContent = `+${added.toLocaleString()}`;
+
+            const isDark = document.documentElement.classList.contains('dark');
+            const textColor = isDark ? '#a1a1aa' : '#52525b';
+            const simChart = echarts.init(document.getElementById('simChart'));
+
+            simChart.setOption({
+                grid: { top: '10%', bottom: '15%', left: '10%', right: '10%' },
+                xAxis: { type: 'category', data: ['Current Baseline', 'Simulated Scenario'], axisLabel: { color: textColor } },
+                yAxis: { type: 'value', max: 100, axisLabel: { color: textColor, formatter: '{value}%' } },
+                series: [{
+                    type: 'bar',
+                    data: [
+                        { value: baseCov, itemStyle: { color: '#71717a' } },
+                        { value: projected, itemStyle: { color: '#10b981' } }
+                    ],
+                    label: { show: true, position: 'top', formatter: '{c}%', color: textColor },
+                    itemStyle: { borderRadius: [4, 4, 0, 0] }
+                }]
+            });
+        }
+
+        // Export Data CSV
+        function exportDataCSV() {
+            let csv = 'ID,Name,District,Category,Organizer,Target,Screened,CoveragePct,Status,CriticalReferrals,CostPerPatient\n';
+            filteredData.forEach(d => {
+                csv += `"${d.id}","${d.name}","${d.district}","${d.category}","${d.organizer}",${d.target},${d.screened},${d.coveragePct},"${d.status}",${d.critical},${d.costPerPatient}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'health_camp_coverage_data.csv');
+            a.click();
+        }
+
+        // Initial Boot
+        applyFilters();
+    </script>
+</body>
+</html>
